@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Atorch DL24 - Bluetooth Monitor</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+  body { font-family: 'JetBrains Mono', monospace; }
+  .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(8px); }
+  .chart-grid { background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px; }
+</style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-8">
+
+<div class="max-w-5xl mx-auto">
+  <!-- Header -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-cyan-400 tracking-tight">ATORCH DL24 <span class="text-slate-500 text-xs ml-2 uppercase tracking-wider">Bluetooth Monitor</span></h1>
+      <p class="text-slate-400 text-sm">Web Bluetooth &bull; Voltage &amp; Current vs Time</p>
+    </div>
+    <div class="flex gap-2">
+      <span id="connBadge" class="px-3 py-1 rounded-full bg-red-900 text-red-300 text-xs border border-red-700/50">DISCONNECTED</span>
+      <button id="btnConnect" class="px-5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed">Connect</button>
+    </div>
+  </div>
+
+  <!-- Live readouts -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="glass p-4 rounded-xl border border-slate-700/50">
+      <div class="text-slate-500 text-xs uppercase tracking-wider mb-1">Voltage</div>
+      <div class="text-3xl font-bold text-cyan-400" id="valVoltage">-- V</div>
+    </div>
+    <div class="glass p-4 rounded-xl border border-slate-700/50">
+      <div class="text-slate-500 text-xs uppercase tracking-wider mb-1">Current</div>
+      <div class="text-3xl font-bold text-rose-400" id="valCurrent">-- A</div>
+    </div>
+    <div class="glass p-4 rounded-xl border border-slate-700/50">
+      <div class="text-slate-500 text-xs uppercase tracking-wider mb-1">Power</div>
+      <div class="text-3xl font-bold text-emerald-400" id="valPower">-- W</div>
+    </div>
+    <div class="glass p-4 rounded-xl border border-slate-700/50">
+      <div class="text-slate-500 text-xs uppercase tracking-wider mb-1">Samples</div>
+      <div class="text-3xl font-bold text-slate-300" id="valSamples">0</div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="glass p-4 rounded-xl border border-slate-700/50 mb-6">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-sm font-semibold text-slate-300">Live Telemetry</h3>
+      <div class="flex gap-2">
+        <button id="btnClear" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 border border-slate-600">Clear</button>
+        <button id="btnExport" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 border border-slate-600">Export CSV</button>
+      </div>
+    </div>
+    <div class="chart-grid h-80 w-full relative">
+      <canvas id="chart" height="320"></canvas>
+    </div>
+    <div class="flex gap-4 mt-2 text-xs text-slate-500">
+      <span><span class="text-cyan-400">&#9632;</span> Voltage (V)</span>
+      <span><span class="text-rose-400">&#9632;</span> Current (A)</span>
+      <span><span class="text-emerald-400">&#9632;</span> Power (W)</span>
+    </div>
+  </div>
+
+  <!-- Controls / polling -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <div class="glass p-4 rounded-xl border border-slate-700/50">
+      <div class="text-slate-500 text-xs uppercase tracking-wider mb-3">Polling</div>
+      <div class="flex items-center gap-3">
+        <label class="text-sm text-slate-300">Interval (ms)</label>
+        <input type="number" id="pollInterval" value="500" min="100" step="100" class="w-20 px-2 py-1.5 rounded bg-slate-900 border border-slate-600 text-sm text-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none">
+      </div>
+      <div class="flex gap-2 mt-4">
+        <button id="btnStart" class="flex-1 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">Start</button>
+        <button id="btnStop" class="flex-1 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">Stop</button>
+      </div>
+      <div class="mt-2">
+        <button id="btnReadOnce" class="w-full py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold border border-slate-500 transition disabled:opacity-50">Read Once</button>
+      </div>
+      <div class="mt-2 text-xs text-slate-500">Requires a secure context (https:// or localhost)</div>
+    </div>
+
+    <!-- GATT UUID config -->
+    <div class="glass p-4 rounded-xl border border-slate-700/50">
+      <div class="text-slate-500 text-xs uppercase tracking-wider mb-3">GATT UUIDs</div>
+      <div class="space-y-2">
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">Service UUID (optional filter)</label>
+          <input type="text" id="svcUuid" value="0000ffe0-0000-1000-8000-00805f9b34fb" class="w-full px-2 py-1.5 rounded bg-slate-900 border border-slate-600 text-xs text-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none">
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">Telemetry Characteristic (read)</label>
+          <input type="text" id="txUuid" value="0000ffe1-0000-1000-8000-00805f9b34fb" class="w-full px-2 py-1.5 rounded bg-slate-900 border border-slate-600 text-xs text-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none">
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 block mb-1">Control Characteristic (write)</label>
+          <input type="text" id="rxUuid" placeholder="write char UUID" class="w-full px-2 py-1.5 rounded bg-slate-900 border border-slate-600 text-xs text-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none">
+        </div>
+      </div>
+      <button id="btnDiscover" class="w-full mt-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-600 transition">Discover Services</button>
+    </div>
+
+    <!-- Parser -->
+    <div class="glass p-4 rounded-xl border border-slate-700/50">
+      <div class="text-slate-500 text-xs uppercase tracking-wider mb-3">Value Parser</div>
+      <div class="space-y-2">
+        <label class="text-xs text-slate-400 block mb-1">Scale (multiply raw)</label>
+        <input type="text" id="scaleV" value="0.001" class="w-16 px-2 py-1.5 rounded bg-slate-900 border border-slate-600 text-xs text-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none" placeholder="V"> V &nbsp;
+        <input type="text" id="scaleI" value="0.001" class="w-16 px-2 py-1.5 rounded bg-slate-900 border border-slate-600 text-xs text-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none" placeholder="A"> A
+      </div>
+      <div class="mt-2 space-y-1">
+        <label class="text-xs text-slate-400 block mb-1">Endianness</label>
+        <div class="flex gap-2">
+          <label class="flex items-center gap-1"><input type="radio" name="endian" value="LE" checked class="accent-cyan-500"> Little-Endian</label>
+          <label class="flex items-center gap-1"><input type="radio" name="endian" value="BE" class="accent-cyan-500"> Big-Endian</label>
+        </div>
+      </div>
+      <div class="mt-2 text-xs text-slate-500">DL24 protocol: FF 55 header, 24-bit BE V@offset4 /100, A@offset7 /100. Checksum validated (XOR or SUM).</div>
+    </div>
+  </div>
+
+  <!-- GATT discovery output -->
+  <div id="discoveryPanel" class="hidden glass p-4 rounded-xl border border-slate-700/50 mb-6">
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="text-sm font-semibold text-slate-300">GATT Services / Characteristics</h3>
+      <button id="btnHideDiscovery" class="text-xs text-slate-500 hover:text-white">Hide</button>
+    </div>
+    <div id="gattList" class="text-xs text-slate-300 space-y-1 max-h-60 overflow-y-auto font-mono"></div>
+  </div>
+
+  <!-- Log -->
+  <div class="glass p-4 rounded-xl border border-slate-700/50">
+    <div class="text-slate-500 text-xs uppercase tracking-wider mb-2">Event Log</div>
+    <div id="log" class="h-32 overflow-y-auto text-xs text-slate-400 font-mono space-y-1"></div>
+  </div>
+
+  <div class="mt-6 text-xs text-slate-600 text-center">
+    Note: Web Bluetooth is supported in Chrome/Edge on Android, Windows, macOS, and Linux (with flags). iOS does not support Web Bluetooth.
+  </div>
+</div>
+
+<script>
+const log = (msg, type = 'info') => {
+  const el = document.getElementById('log');
+  const div = document.createElement('div');
+  const t = new Date().toLocaleTimeString();
+  let color = 'text-slate-400';
+  if (type === 'ok') color = 'text-emerald-400';
+  if (type === 'err') color = 'text-rose-400';
+  if (type === 'wrn') color = 'text-amber-400';
+  div.className = color;
+  div.textContent = `[${t}] ${msg}`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+};
+
+let device = null;
+let server = null;
+let txChar = null;
+let rxChar = null;
+let polling = false;
+let pollTimer = null;
+const readings = { t: [], v: [], i: [], p: [] };
+const MAX_POINTS = 400;
+let chart = null;
+
+const btnConnect = document.getElementById('btnConnect');
+const btnStart = document.getElementById('btnStart');
+const btnStop = document.getElementById('btnStop');
+const btnReadOnce = document.getElementById('btnReadOnce');
+const btnClear = document.getElementById('btnClear');
+const btnExport = document.getElementById('btnExport');
+const btnDiscover = document.getElementById('btnDiscover');
+const btnHideDiscovery = document.getElementById('btnHideDiscovery');
+const connBadge = document.getElementById('connBadge');
+const discoveryPanel = document.getElementById('discoveryPanel');
+const gattList = document.getElementById('gattList');
+
+const initChart = () => {
+  const ctx = document.getElementById('chart').getContext('2d');
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: readings.t,
+      datasets: [
+        { label: 'Voltage (V)', data: readings.v, borderColor: '#22d3ee', backgroundColor: 'rgba(34,211,238,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
+        { label: 'Current (A)', data: readings.i, borderColor: '#fb7185', backgroundColor: 'rgba(251,113,133,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y1' },
+        { label: 'Power (W)', data: readings.p, borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
+      ]
+    },
+    options: {
+      animation: false,
+      responsive: true,
+      maintainAspectRatio: false,
+      tooltips: { mode: 'nearest', intersect: false },
+      scales: {
+        yAxes: [{
+          id: 'y',
+          type: 'linear',
+          position: 'left',
+          gridLines: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#94a3b8', fontSize: 11 },
+          scaleLabel: { display: true, labelString: 'V / W', fontColor: '#64748b', fontSize: 11 }
+        }, {
+          id: 'y1',
+          type: 'linear',
+          position: 'right',
+          gridLines: { drawOnChartArea: false },
+          ticks: { color: '#94a3b8', fontSize: 11 },
+          scaleLabel: { display: true, labelString: 'A', fontColor: '#64748b', fontSize: 11 }
+        }],
+        xAxes: [{
+          id: 'x',
+          gridLines: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#64748b', fontSize: 10, maxTicksLimit: 12 }
+        }]
+      },
+      legend: { display: false }
+    }
+  });
+};
+initChart();
+
+const updateReadouts = (v, i, p) => {
+  document.getElementById('valVoltage').textContent = (v == null ? '--' : v.toFixed(3)) + ' V';
+  document.getElementById('valCurrent').textContent = (i == null ? '--' : i.toFixed(3)) + ' A';
+  document.getElementById('valPower').textContent = (p == null ? '--' : p.toFixed(2)) + ' W';
+  document.getElementById('valSamples').textContent = readings.t.length;
+};
+
+const pushPoint = (v, i) => {
+  const now = new Date().toLocaleTimeString([], { hour12: false });
+  const p = (v != null && i != null) ? v * i : null;
+  readings.t.push(now);
+  readings.v.push(v == null ? null : v);
+  readings.i.push(i == null ? null : i);
+  readings.p.push(p == null ? null : p);
+  if (readings.t.length > MAX_POINTS) {
+    readings.t.shift(); readings.v.shift(); readings.i.shift(); readings.p.shift();
+  }
+  updateReadouts(v, i, p);
+  chart.update();
+  log('pushPoint #'+readings.t.length+' V='+v+' A='+i, 'ok');
+};
+
+// ---------- DL24 Binary Protocol Parser ----------
+// Packet: FF 55 | MsgType(1) | Payload... | Checksum(1)
+// MsgType 0x01 = Report, DeviceType 0x02=DC / 0x03=USB
+// Voltage @ offset 4: 24-bit BE / 100  |  Current @ offset 7: 24-bit BE / 100
+// Checksum = (sum of bytes offset 2 .. len-2) & 0xff ^ 0x44  (magic header excluded)
+
+const dl24Checksum = (dv) => {
+  let s = 0;
+  for (let i = 2; i < dv.byteLength - 1; i++) s += dv.getUint8(i);
+  return ((s & 0xff) ^ 0x44) & 0xff;
+};
+
+const read24BE = (dv, off) => {
+  return (dv.getUint8(off) << 16) | (dv.getUint8(off + 1) << 8) | dv.getUint8(off + 2);
+};
+
+const parseValue = (dataView) => {
+  const len = dataView.byteLength;
+  if (len < 10) return null; // ignore short reply packets silently
+
+  // Magic header FF 55 — ignore silently if missing (likely a reply packet)
+  if (dataView.getUint8(0) !== 0xff || dataView.getUint8(1) !== 0x55) return null;
+
+  log('Raw packet: ' + Array.from(new Uint8Array(dataView.buffer)).map(b=>b.toString(16).padStart(2,'0')).join(' '), 'info');
+
+  // Magic header FF 55
+  if (dataView.getUint8(0) !== 0xff || dataView.getUint8(1) !== 0x55) return null;
+
+  const msgType = dataView.getUint8(2);
+  if (msgType !== 0x01) return null; // only handle Report
+
+  const deviceType = dataView.getUint8(3);
+  if (deviceType !== 0x02 && deviceType !== 0x03) return null; // DC or USB meter
+
+  // Checksum (last byte): sum(offset 2..len-2) & 0xff ^ 0x44
+  const checksum = dataView.getUint8(len - 1);
+  const calcChecksum = dl24Checksum(dataView);
+  if (checksum !== calcChecksum) {
+    log('Checksum mismatch (got ' + checksum + ', calc ' + calcChecksum + ')', 'wrn');
+  }
+
+  // Voltage: offset 4, 3 bytes BE, /100  |  Current: offset 7, 3 bytes BE, /100
+  const vRaw = read24BE(dataView, 4);
+  const iRaw = read24BE(dataView, 7);
+
+  const v = vRaw / 100;
+  const i = iRaw / 100;
+
+  // Sanity range
+  if (v > 200 || i > 100) {
+    log('Out of range: v=' + v + ' i=' + i, 'wrn');
+    return null;
+  }
+
+  log('Parsed: V=' + v.toFixed(3) + ' A=' + i.toFixed(3) + ' (raw ' + vRaw + ',' + iRaw + ')', 'ok');
+  return { v, i };
+};
+
+// ---------- Bluetooth ----------
+const gatherServices = async (server) => {
+  const services = await server.getPrimaryServices();
+  const lines = [];
+  for (const svc of services) {
+    lines.push(`<div class="text-slate-500">• ${svc.uuid}</div>`);
+    try {
+      const chars = await svc.getCharacteristics();
+      for (const ch of chars) {
+        const props = [];
+        if (ch.properties.read) props.push('read');
+        if (ch.properties.write) props.push('write');
+        if (ch.properties.writeWithoutResponse) props.push('writeNR');
+        if (ch.properties.notify) props.push('notify');
+        if (ch.properties.indicate) props.push('indicate');
+        lines.push(`<div class="ml-3 text-xs text-slate-400">  - ${ch.uuid} [${props.join(', ')}]</div>`);
+      }
+    } catch (e) {
+      lines.push(`<div class="ml-3 text-xs text-rose-500">  (cannot read characteristics)</div>`);
+    }
+  }
+  gattList.innerHTML = lines.join('');
+};
+
+btnConnect.addEventListener('click', async () => {
+  if (server && device.gatt.connected) {
+    disconnect();
+    return;
+  }
+  try {
+    btnConnect.disabled = true;
+    btnConnect.textContent = 'Connecting...';
+    log('Requesting device...', 'wrn');
+
+    const filters = [];
+    const svc = document.getElementById('svcUuid').value.trim();
+    if (svc) filters.push({ services: [svc] });
+
+    device = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: !svc,
+      optionalServices: svc ? [] : undefined,
+      filters: svc ? filters : undefined
+    });
+
+    device.addEventListener('gattserverdisconnected', () => {
+      log('Device disconnected', 'err');
+      setConnected(false);
+    });
+
+    log('Connecting to GATT server...', 'wrn');
+    server = await device.gatt.connect();
+    log('Connected to ' + (device.name || device.id), 'ok');
+
+    await gatherServices(server);
+
+    // Auto-select tx char: first notify/read characteristic
+    txChar = null; rxChar = null;
+    const services = await server.getPrimaryServices();
+    for (const svc of services) {
+      const chars = await svc.getCharacteristics();
+      for (const ch of chars) {
+        if (!txChar && (ch.properties.notify || ch.properties.read)) txChar = ch;
+        if (!rxChar && (ch.properties.write || ch.properties.writeWithoutResponse)) rxChar = ch;
+      }
+    }
+
+    if (txChar) {
+      log('Using characteristic: ' + txChar.uuid + ' [notify=' + txChar.properties.notify + ' read=' + txChar.properties.read + ']', 'ok');
+      if (txChar.properties.notify) {
+        await txChar.startNotifications();
+        txChar.addEventListener('characteristicvaluechanged', (e) => {
+          const dv = e.target.value;
+          log('Notification received, len=' + dv.byteLength + ' hex=' + Array.from(new Uint8Array(dv.buffer)).map(b=>b.toString(16).padStart(2,'0')).join(' '), 'info');
+          const parsed = parseValue(dv);
+          if (parsed) pushPoint(parsed.v, parsed.i);
+          else log('parseValue returned null for notification', 'wrn');
+        });
+      }
+    } else {
+      log('No readable characteristic found. Use Discover to inspect.', 'wrn');
+    }
+
+    setConnected(true);
+    btnConnect.textContent = 'Disconnect';
+    btnConnect.classList.replace('bg-cyan-600', 'bg-rose-600');
+    btnConnect.classList.replace('hover:bg-cyan-500', 'hover:bg-rose-500');
+  } catch (e) {
+    log('Error: ' + e.message, 'err');
+    console.error(e);
+  } finally {
+    btnConnect.disabled = false;
+  }
+});
+
+const disconnect = () => {
+  stopPolling();
+  if (txChar && txChar.properties.notify) {
+    try { txChar.removeEventListener('characteristicvaluechanged', null); } catch (e) {}
+    try { txChar.stopNotifications(); } catch (e) {}
+  }
+  if (server) {
+    try { server.disconnect(); } catch (e) {}
+  }
+  server = null; device = null; txChar = null; rxChar = null;
+  setConnected(false);
+  log('Disconnected', 'err');
+};
+
+
+const setConnected = (connected) => {
+  if (connected) {
+    connBadge.textContent = 'CONNECTED';
+    connBadge.className = 'px-3 py-1 rounded-full bg-emerald-900 text-emerald-300 border border-emerald-700/50';
+    btnStart.disabled = false;
+    btnReadOnce.disabled = false;
+  } else {
+    connBadge.textContent = 'DISCONNECTED';
+    connBadge.className = 'px-3 py-1 rounded-full bg-red-900 text-red-300 border border-red-700/50';
+    btnStart.disabled = true;
+    btnStop.disabled = true;
+    btnReadOnce.disabled = true;
+  }
+};
+
+// ---------- Manual read / polling ----------
+const readOnce = async () => {
+  if (!txChar) { log('No characteristic', 'wrn'); return; }
+  if (!txChar.properties.read) { log('Characteristic not readable', 'wrn'); return; }
+  try {
+    const val = await txChar.readValue();
+    log('Manual read, len=' + val.byteLength + ' hex=' + Array.from(new Uint8Array(val.buffer)).map(b=>b.toString(16).padStart(2,'0')).join(' '), 'info');
+    const parsed = parseValue(val);
+    if (parsed) { pushPoint(parsed.v, parsed.i); }
+    else log('parseValue returned null for manual read', 'wrn');
+  } catch (e) {
+    log('Read error: ' + e.message, 'err');
+  }
+};
+
+const startPolling = () => {
+  if (polling) return;
+  const ms = parseInt(document.getElementById('pollInterval').value) || 500;
+  polling = true;
+  btnStart.disabled = true;
+  btnStop.disabled = false;
+  log('Polling started (' + ms + 'ms)', 'ok');
+  pollTimer = setInterval(async () => {
+    await readOnce();
+  }, ms);
+};
+
+const stopPolling = () => {
+  polling = false;
+  clearInterval(pollTimer);
+  pollTimer = null;
+  btnStart.disabled = false;
+  btnStop.disabled = true;
+  log('Polling stopped', 'wrn');
+};
+
+btnStart.addEventListener('click', startPolling);
+btnStop.addEventListener('click', stopPolling);
+btnReadOnce.addEventListener('click', () => { readOnce(); });
+
+btnDiscover.addEventListener('click', async () => {
+  if (!server) { log('Connect first', 'wrn'); return; }
+  try {
+    btnDiscover.disabled = true;
+    btnDiscover.textContent = 'Discovering...';
+    await gatherServices(server);
+    discoveryPanel.classList.remove('hidden');
+    log('Services listed', 'ok');
+  } catch (e) {
+    log('Discovery error: ' + e.message, 'err');
+  } finally {
+    btnDiscover.disabled = false;
+    btnDiscover.textContent = 'Discover Services';
+  }
+});
+
+btnHideDiscovery.addEventListener('click', () => {
+  discoveryPanel.classList.add('hidden');
+});
+
+btnClear.addEventListener('click', () => {
+  readings.t = []; readings.v = []; readings.i = []; readings.p = [];
+  updateReadouts(null, null, null);
+  chart.update();
+  log('Chart cleared', 'wrn');
+});
+
+btnExport.addEventListener('click', () => {
+  if (readings.t.length === 0) { log('No data to export', 'wrn'); return; }
+  let csv = 'time,voltage_V,current_A,power_W\n';
+  for (let k = 0; k < readings.t.length; k++) {
+    csv += `${readings.t[k]},${readings.v[k] == null ? '' : readings.v[k]},${readings.i[k] == null ? '' : readings.i[k]},${readings.p[k] == null ? '' : readings.p[k]}\n`;
+  }
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'dl24_telemetry.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  log('Exported CSV', 'ok');
+});
+
+// manual read on connect if no notifications
+setInterval(() => {
+  if (server && device.gatt.connected && txChar && txChar.properties.read && !polling && txChar.properties.notify === false) {
+    readOnce();
+  }
+}, 1000);
+
+log('Ready. Click Connect and choose your Atorch DL24.', 'info');
+</script>
+</body>
+</html>
