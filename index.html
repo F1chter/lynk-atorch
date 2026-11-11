@@ -204,6 +204,30 @@ const updateReadouts = (v, i, p, e, c, temp, timeStr) => {
 
 const pushPoint = (v, i, p, e, c, temp, timeStr) => {
   const now = new Date().toLocaleTimeString([], { hour12: false });
+
+  // Compact buffer when full: average each pair of points
+  if (readings.t.length >= MAX_POINTS) {
+    const half = Math.floor(MAX_POINTS / 2);
+    const avg = (a, b) => (a == null || b == null) ? null : (a + b) / 2;
+
+    const newT = [], newV = [], newI = [], newP = [], newE = [], newC = [], newTemp = [], newTime = [];
+    for (let k = 0; k < half; k++) {
+      const a = k * 2;
+      const b = k * 2 + 1;
+      newT.push(readings.t[b]);                                    // keep later timestamp
+      newV.push(avg(readings.v[a], readings.v[b]));
+      newI.push(avg(readings.i[a], readings.i[b]));
+      newP.push(avg(readings.p[a], readings.p[b]));
+      newE.push(avg(readings.e[a], readings.e[b]));
+      newC.push(avg(readings.c[a], readings.c[b]));
+      newTemp.push(avg(readings.temp[a], readings.temp[b]));
+      newTime.push(readings.time[b] == null ? null : readings.time[b]);
+    }
+    readings.t = newT; readings.v = newV; readings.i = newI; readings.p = newP;
+    readings.e = newE; readings.c = newC; readings.temp = newTemp; readings.time = newTime;
+    log('Compacted buffer to ' + readings.t.length + ' samples', 'wrn');
+  }
+
   readings.t.push(now);
   readings.v.push(v == null ? null : v);
   readings.i.push(i == null ? null : i);
@@ -212,10 +236,6 @@ const pushPoint = (v, i, p, e, c, temp, timeStr) => {
   readings.c.push(c == null ? null : c);
   readings.temp.push(temp == null ? null : temp);
   readings.time.push(timeStr == null ? null : timeStr);
-  if (readings.t.length >= MAX_POINTS) {
-    readings.t.shift(); readings.v.shift(); readings.i.shift(); readings.p.shift();
-    readings.e.shift(); readings.c.shift(); readings.temp.shift(); readings.time.shift();
-  }
   updateReadouts(v, i, p, e, c, temp, timeStr);
   chart.update();
   log('pushPoint #'+readings.t.length+' V='+v+' A='+i+' Wh='+e+' Temp='+temp, 'ok');
