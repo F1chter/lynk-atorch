@@ -132,7 +132,7 @@ let server = null;
 let txChar = null;
 let rxChar = null;
 const readings = { t: [], v: [], i: [], p: [], e: [], c: [], temp: [], time: [] };
-const MAX_POINTS = 400;
+const MAX_POINTS = 1000;
 let chart = null;
 
 const btnConnect = document.getElementById('btnConnect');
@@ -212,7 +212,7 @@ const pushPoint = (v, i, p, e, c, temp, timeStr) => {
   readings.c.push(c == null ? null : c);
   readings.temp.push(temp == null ? null : temp);
   readings.time.push(timeStr == null ? null : timeStr);
-  if (readings.t.length > MAX_POINTS) {
+  if (readings.t.length >= MAX_POINTS) {
     readings.t.shift(); readings.v.shift(); readings.i.shift(); readings.p.shift();
     readings.e.shift(); readings.c.shift(); readings.temp.shift(); readings.time.shift();
   }
