@@ -70,63 +70,6 @@
     </div>
   </div>
 
-  <!-- Controls / polling -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-    <div class="glass p-4 rounded-xl border border-slate-700/50">
-      <div class="text-slate-500 text-xs uppercase tracking-wider mb-3">Polling</div>
-      <div class="flex items-center gap-3">
-        <label class="text-sm text-slate-300">Interval (ms)</label>
-        <input type="number" id="pollInterval" value="500" min="100" step="100" class="w-20 px-2 py-1.5 rounded bg-slate-900 border border-slate-600 text-sm text-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none">
-      </div>
-      <div class="flex gap-2 mt-4">
-        <button id="btnStart" class="flex-1 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">Start</button>
-        <button id="btnStop" class="flex-1 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed">Stop</button>
-      </div>
-      <div class="mt-2">
-        <button id="btnReadOnce" class="w-full py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold border border-slate-500 transition disabled:opacity-50">Read Once</button>
-      </div>
-      <div class="mt-2 text-xs text-slate-500">Requires a secure context (https:// or localhost)</div>
-    </div>
-
-    <!-- GATT UUID config -->
-    <div class="glass p-4 rounded-xl border border-slate-700/50">
-      <div class="text-slate-500 text-xs uppercase tracking-wider mb-3">GATT UUIDs</div>
-      <div class="space-y-2">
-        <div>
-          <label class="text-xs text-slate-400 block mb-1">Service UUID (optional filter)</label>
-          <input type="text" id="svcUuid" value="0000ffe0-0000-1000-8000-00805f9b34fb" class="w-full px-2 py-1.5 rounded bg-slate-900 border border-slate-600 text-xs text-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none">
-        </div>
-        <div>
-          <label class="text-xs text-slate-400 block mb-1">Telemetry Characteristic (read)</label>
-          <input type="text" id="txUuid" value="0000ffe1-0000-1000-8000-00805f9b34fb" class="w-full px-2 py-1.5 rounded bg-slate-900 border border-slate-600 text-xs text-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none">
-        </div>
-        <div>
-          <label class="text-xs text-slate-400 block mb-1">Control Characteristic (write)</label>
-          <input type="text" id="rxUuid" placeholder="write char UUID" class="w-full px-2 py-1.5 rounded bg-slate-900 border border-slate-600 text-xs text-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none">
-        </div>
-      </div>
-      <button id="btnDiscover" class="w-full mt-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-600 transition">Discover Services</button>
-    </div>
-
-    <!-- Parser -->
-    <div class="glass p-4 rounded-xl border border-slate-700/50">
-      <div class="text-slate-500 text-xs uppercase tracking-wider mb-3">Value Parser</div>
-      <div class="space-y-2">
-        <label class="text-xs text-slate-400 block mb-1">Scale (multiply raw)</label>
-        <input type="text" id="scaleV" value="0.001" class="w-16 px-2 py-1.5 rounded bg-slate-900 border border-slate-600 text-xs text-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none" placeholder="V"> V &nbsp;
-        <input type="text" id="scaleI" value="0.001" class="w-16 px-2 py-1.5 rounded bg-slate-900 border border-slate-600 text-xs text-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none" placeholder="A"> A
-      </div>
-      <div class="mt-2 space-y-1">
-        <label class="text-xs text-slate-400 block mb-1">Endianness</label>
-        <div class="flex gap-2">
-          <label class="flex items-center gap-1"><input type="radio" name="endian" value="LE" checked class="accent-cyan-500"> Little-Endian</label>
-          <label class="flex items-center gap-1"><input type="radio" name="endian" value="BE" class="accent-cyan-500"> Big-Endian</label>
-        </div>
-      </div>
-      <div class="mt-2 text-xs text-slate-500">DL24 protocol: FF 55 header, 24-bit BE V@offset4 /100, A@offset7 /100. Checksum validated (XOR or SUM).</div>
-    </div>
-  </div>
-
   <!-- GATT discovery output -->
   <div id="discoveryPanel" class="hidden glass p-4 rounded-xl border border-slate-700/50 mb-6">
     <div class="flex justify-between items-center mb-3">
@@ -166,19 +109,13 @@ let device = null;
 let server = null;
 let txChar = null;
 let rxChar = null;
-let polling = false;
-let pollTimer = null;
 const readings = { t: [], v: [], i: [], p: [] };
 const MAX_POINTS = 400;
 let chart = null;
 
 const btnConnect = document.getElementById('btnConnect');
-const btnStart = document.getElementById('btnStart');
-const btnStop = document.getElementById('btnStop');
-const btnReadOnce = document.getElementById('btnReadOnce');
 const btnClear = document.getElementById('btnClear');
 const btnExport = document.getElementById('btnExport');
-const btnDiscover = document.getElementById('btnDiscover');
 const btnHideDiscovery = document.getElementById('btnHideDiscovery');
 const connBadge = document.getElementById('connBadge');
 const discoveryPanel = document.getElementById('discoveryPanel');
@@ -276,9 +213,6 @@ const parseValue = (dataView) => {
 
   log('Raw packet: ' + Array.from(new Uint8Array(dataView.buffer)).map(b=>b.toString(16).padStart(2,'0')).join(' '), 'info');
 
-  // Magic header FF 55
-  if (dataView.getUint8(0) !== 0xff || dataView.getUint8(1) !== 0x55) return null;
-
   const msgType = dataView.getUint8(2);
   if (msgType !== 0x01) return null; // only handle Report
 
@@ -343,14 +277,9 @@ btnConnect.addEventListener('click', async () => {
     btnConnect.textContent = 'Connecting...';
     log('Requesting device...', 'wrn');
 
-    const filters = [];
-    const svc = document.getElementById('svcUuid').value.trim();
-    if (svc) filters.push({ services: [svc] });
-
     device = await navigator.bluetooth.requestDevice({
-      acceptAllDevices: !svc,
-      optionalServices: svc ? [] : undefined,
-      filters: svc ? filters : undefined
+      acceptAllDevices: true,
+      optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
     });
 
     device.addEventListener('gattserverdisconnected', () => {
@@ -361,8 +290,6 @@ btnConnect.addEventListener('click', async () => {
     log('Connecting to GATT server...', 'wrn');
     server = await device.gatt.connect();
     log('Connected to ' + (device.name || device.id), 'ok');
-
-    await gatherServices(server);
 
     // Auto-select tx char: first notify/read characteristic
     txChar = null; rxChar = null;
@@ -381,14 +308,12 @@ btnConnect.addEventListener('click', async () => {
         await txChar.startNotifications();
         txChar.addEventListener('characteristicvaluechanged', (e) => {
           const dv = e.target.value;
-          log('Notification received, len=' + dv.byteLength + ' hex=' + Array.from(new Uint8Array(dv.buffer)).map(b=>b.toString(16).padStart(2,'0')).join(' '), 'info');
           const parsed = parseValue(dv);
           if (parsed) pushPoint(parsed.v, parsed.i);
-          else log('parseValue returned null for notification', 'wrn');
         });
       }
     } else {
-      log('No readable characteristic found. Use Discover to inspect.', 'wrn');
+      log('No readable characteristic found.', 'wrn');
     }
 
     setConnected(true);
@@ -404,7 +329,6 @@ btnConnect.addEventListener('click', async () => {
 });
 
 const disconnect = () => {
-  stopPolling();
   if (txChar && txChar.properties.notify) {
     try { txChar.removeEventListener('characteristicvaluechanged', null); } catch (e) {}
     try { txChar.stopNotifications(); } catch (e) {}
@@ -422,76 +346,13 @@ const setConnected = (connected) => {
   if (connected) {
     connBadge.textContent = 'CONNECTED';
     connBadge.className = 'px-3 py-1 rounded-full bg-emerald-900 text-emerald-300 border border-emerald-700/50';
-    btnStart.disabled = false;
-    btnReadOnce.disabled = false;
   } else {
     connBadge.textContent = 'DISCONNECTED';
     connBadge.className = 'px-3 py-1 rounded-full bg-red-900 text-red-300 border border-red-700/50';
-    btnStart.disabled = true;
-    btnStop.disabled = true;
-    btnReadOnce.disabled = true;
   }
 };
 
-// ---------- Manual read / polling ----------
-const readOnce = async () => {
-  if (!txChar) { log('No characteristic', 'wrn'); return; }
-  if (!txChar.properties.read) { log('Characteristic not readable', 'wrn'); return; }
-  try {
-    const val = await txChar.readValue();
-    log('Manual read, len=' + val.byteLength + ' hex=' + Array.from(new Uint8Array(val.buffer)).map(b=>b.toString(16).padStart(2,'0')).join(' '), 'info');
-    const parsed = parseValue(val);
-    if (parsed) { pushPoint(parsed.v, parsed.i); }
-    else log('parseValue returned null for manual read', 'wrn');
-  } catch (e) {
-    log('Read error: ' + e.message, 'err');
-  }
-};
-
-const startPolling = () => {
-  if (polling) return;
-  const ms = parseInt(document.getElementById('pollInterval').value) || 500;
-  polling = true;
-  btnStart.disabled = true;
-  btnStop.disabled = false;
-  log('Polling started (' + ms + 'ms)', 'ok');
-  pollTimer = setInterval(async () => {
-    await readOnce();
-  }, ms);
-};
-
-const stopPolling = () => {
-  polling = false;
-  clearInterval(pollTimer);
-  pollTimer = null;
-  btnStart.disabled = false;
-  btnStop.disabled = true;
-  log('Polling stopped', 'wrn');
-};
-
-btnStart.addEventListener('click', startPolling);
-btnStop.addEventListener('click', stopPolling);
-btnReadOnce.addEventListener('click', () => { readOnce(); });
-
-btnDiscover.addEventListener('click', async () => {
-  if (!server) { log('Connect first', 'wrn'); return; }
-  try {
-    btnDiscover.disabled = true;
-    btnDiscover.textContent = 'Discovering...';
-    await gatherServices(server);
-    discoveryPanel.classList.remove('hidden');
-    log('Services listed', 'ok');
-  } catch (e) {
-    log('Discovery error: ' + e.message, 'err');
-  } finally {
-    btnDiscover.disabled = false;
-    btnDiscover.textContent = 'Discover Services';
-  }
-});
-
-btnHideDiscovery.addEventListener('click', () => {
-  discoveryPanel.classList.add('hidden');
-});
+// ---------- Bluetooth ----------
 
 btnClear.addEventListener('click', () => {
   readings.t = []; readings.v = []; readings.i = []; readings.p = [];
@@ -516,12 +377,9 @@ btnExport.addEventListener('click', () => {
   log('Exported CSV', 'ok');
 });
 
-// manual read on connect if no notifications
-setInterval(() => {
-  if (server && device.gatt.connected && txChar && txChar.properties.read && !polling && txChar.properties.notify === false) {
-    readOnce();
-  }
-}, 1000);
+btnHideDiscovery.addEventListener('click', () => {
+  discoveryPanel.classList.add('hidden');
+});
 
 log('Ready. Click Connect and choose your Atorch DL24.', 'info');
 </script>
