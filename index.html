@@ -51,6 +51,25 @@
     </div>
   </div>
 
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="glass p-4 rounded-xl border border-slate-700/50">
+      <div class="text-slate-500 text-xs uppercase tracking-wider mb-1">Energy</div>
+      <div class="text-3xl font-bold text-purple-400" id="valEnergy">-- Wh</div>
+    </div>
+    <div class="glass p-4 rounded-xl border border-slate-700/50">
+      <div class="text-slate-500 text-xs uppercase tracking-wider mb-1">Capacity</div>
+      <div class="text-3xl font-bold text-amber-400" id="valCapacity">-- Ah</div>
+    </div>
+    <div class="glass p-4 rounded-xl border border-slate-700/50">
+      <div class="text-slate-500 text-xs uppercase tracking-wider mb-1">Temperature</div>
+      <div class="text-3xl font-bold text-orange-400" id="valTemp">-- °C</div>
+    </div>
+    <div class="glass p-4 rounded-xl border border-slate-700/50">
+      <div class="text-slate-500 text-xs uppercase tracking-wider mb-1">Time</div>
+      <div class="text-3xl font-bold text-slate-300" id="valTime">--:--:--</div>
+    </div>
+  </div>
+
   <!-- Chart -->
   <div class="glass p-4 rounded-xl border border-slate-700/50 mb-6">
     <div class="flex items-center justify-between mb-3">
@@ -67,6 +86,9 @@
       <span><span class="text-cyan-400">&#9632;</span> Voltage (V)</span>
       <span><span class="text-rose-400">&#9632;</span> Current (A)</span>
       <span><span class="text-emerald-400">&#9632;</span> Power (W)</span>
+      <span><span class="text-purple-400">&#9632;</span> Energy (Wh)</span>
+      <span><span class="text-amber-400">&#9632;</span> Capacity (Ah)</span>
+      <span><span class="text-orange-400">&#9632;</span> Temp (°C)</span>
     </div>
   </div>
 
@@ -109,7 +131,7 @@ let device = null;
 let server = null;
 let txChar = null;
 let rxChar = null;
-const readings = { t: [], v: [], i: [], p: [] };
+const readings = { t: [], v: [], i: [], p: [], e: [], c: [], temp: [], time: [] };
 const MAX_POINTS = 400;
 let chart = null;
 
@@ -129,8 +151,11 @@ const initChart = () => {
       labels: readings.t,
       datasets: [
         { label: 'Voltage (V)', data: readings.v, borderColor: '#22d3ee', backgroundColor: 'rgba(34,211,238,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
-        { label: 'Current (A)', data: readings.i, borderColor: '#fb7185', backgroundColor: 'rgba(251,113,133,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y1' },
+        { label: 'Current (A)', data: readings.i, borderColor: '#fb7185', backgroundColor: 'rgba(251,113,133,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
         { label: 'Power (W)', data: readings.p, borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
+        { label: 'Energy (Wh)', data: readings.e, borderColor: '#a855f7', backgroundColor: 'rgba(168,85,247,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
+        { label: 'Capacity (Ah)', data: readings.c, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
+        { label: 'Temp (°C)', data: readings.temp, borderColor: '#fb923c', backgroundColor: 'rgba(251,146,60,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
       ]
     },
     options: {
@@ -166,33 +191,46 @@ const initChart = () => {
 };
 initChart();
 
-const updateReadouts = (v, i, p) => {
+const updateReadouts = (v, i, p, e, c, temp, timeStr) => {
   document.getElementById('valVoltage').textContent = (v == null ? '--' : v.toFixed(3)) + ' V';
   document.getElementById('valCurrent').textContent = (i == null ? '--' : i.toFixed(3)) + ' A';
   document.getElementById('valPower').textContent = (p == null ? '--' : p.toFixed(2)) + ' W';
   document.getElementById('valSamples').textContent = readings.t.length;
+  document.getElementById('valEnergy').textContent = (e == null ? '--' : e.toFixed(2)) + ' Wh';
+  document.getElementById('valCapacity').textContent = (c == null ? '--' : c.toFixed(3)) + ' Ah';
+  document.getElementById('valTemp').textContent = (temp == null ? '--' : temp.toFixed(1)) + ' °C';
+  document.getElementById('valTime').textContent = timeStr == null ? '--:--:--' : timeStr;
 };
 
-const pushPoint = (v, i) => {
+const pushPoint = (v, i, p, e, c, temp, timeStr) => {
   const now = new Date().toLocaleTimeString([], { hour12: false });
-  const p = (v != null && i != null) ? v * i : null;
   readings.t.push(now);
   readings.v.push(v == null ? null : v);
   readings.i.push(i == null ? null : i);
   readings.p.push(p == null ? null : p);
+  readings.e.push(e == null ? null : e);
+  readings.c.push(c == null ? null : c);
+  readings.temp.push(temp == null ? null : temp);
+  readings.time.push(timeStr == null ? null : timeStr);
   if (readings.t.length > MAX_POINTS) {
     readings.t.shift(); readings.v.shift(); readings.i.shift(); readings.p.shift();
+    readings.e.shift(); readings.c.shift(); readings.temp.shift(); readings.time.shift();
   }
-  updateReadouts(v, i, p);
+  updateReadouts(v, i, p, e, c, temp, timeStr);
   chart.update();
-  log('pushPoint #'+readings.t.length+' V='+v+' A='+i, 'ok');
+  log('pushPoint #'+readings.t.length+' V='+v+' A='+i+' Wh='+e+' Temp='+temp, 'ok');
 };
 
 // ---------- DL24 Binary Protocol Parser ----------
 // Packet: FF 55 | MsgType(1) | Payload... | Checksum(1)
-// MsgType 0x01 = Report, DeviceType 0x02=DC / 0x03=USB
-// Voltage @ offset 4: 24-bit BE / 100  |  Current @ offset 7: 24-bit BE / 100
-// Checksum = (sum of bytes offset 2 .. len-2) & 0xff ^ 0x44  (magic header excluded)
+// MsgType 0x01 = Report, DeviceType 0x01 = DC Meter
+// 04: Voltage, 3 bytes BE, /10
+// 07: Current, 3 bytes BE, /1000
+// 0A: Power (Watt), 3 bytes BE, /10
+// 0D: Energy (W·h), 4 bytes BE, /100
+// 18: Temperature, 2 bytes BE (signed)
+// 1A: Hour (2 bytes BE), 1C: Minute (1 byte), 1D: Second (1 byte)
+// Checksum = (sum of bytes offset 2 .. len-2) & 0xff ^ 0x44
 
 const dl24Checksum = (dv) => {
   let s = 0;
@@ -204,20 +242,30 @@ const read24BE = (dv, off) => {
   return (dv.getUint8(off) << 16) | (dv.getUint8(off + 1) << 8) | dv.getUint8(off + 2);
 };
 
+const read16BE = (dv, off) => {
+  return dv.getUint16(off, false);
+};
+
+const read16BESigned = (dv, off) => {
+  return dv.getInt16(off, false);
+};
+
+const read32BE = (dv, off) => {
+  return (dv.getUint8(off) << 24) | (dv.getUint8(off + 1) << 16) | (dv.getUint8(off + 2) << 8) | dv.getUint8(off + 3);
+};
+
 const parseValue = (dataView) => {
   const len = dataView.byteLength;
-  if (len < 10) return null; // ignore short reply packets silently
+  if (len < 31) return null; // ignore short reply packets
 
-  // Magic header FF 55 — ignore silently if missing (likely a reply packet)
+  // Magic header FF 55 — ignore silently if missing
   if (dataView.getUint8(0) !== 0xff || dataView.getUint8(1) !== 0x55) return null;
-
-  log('Raw packet: ' + Array.from(new Uint8Array(dataView.buffer)).map(b=>b.toString(16).padStart(2,'0')).join(' '), 'info');
 
   const msgType = dataView.getUint8(2);
   if (msgType !== 0x01) return null; // only handle Report
 
   const deviceType = dataView.getUint8(3);
-  if (deviceType !== 0x02 && deviceType !== 0x03) return null; // DC or USB meter
+  if (deviceType !== 0x01) return null; // only DC Meter report
 
   // Checksum (last byte): sum(offset 2..len-2) & 0xff ^ 0x44
   const checksum = dataView.getUint8(len - 1);
@@ -226,21 +274,38 @@ const parseValue = (dataView) => {
     log('Checksum mismatch (got ' + checksum + ', calc ' + calcChecksum + ')', 'wrn');
   }
 
-  // Voltage: offset 4, 3 bytes BE, /100  |  Current: offset 7, 3 bytes BE, /100
+  // Voltage: offset 4, 3 bytes BE, /10
   const vRaw = read24BE(dataView, 4);
-  const iRaw = read24BE(dataView, 7);
+  const v = vRaw / 10;
 
-  const v = vRaw / 100;
-  const i = iRaw / 100;
+  // Current: offset 7, 3 bytes BE, /1000
+  const iRaw = read24BE(dataView, 7);
+  const i = iRaw / 1000;
+
+  // Power: offset 0x0A, 3 bytes BE, /10
+  const pRaw = read24BE(dataView, 0x0A);
+  const p = pRaw / 10;
+
+  // Energy: offset 0x0D, 4 bytes BE, /100
+  const eRaw = read32BE(dataView, 0x0D);
+  const e = eRaw / 100;
+
+  // Capacity (Ah) = Energy (Wh) / Voltage (V)
+  const c = (v > 0) ? e / v : null;
+
+  // Temperature: offset 0x18, 2 bytes BE signed
+  const temp = read16BESigned(dataView, 0x18);
+
+  // Time: Hour(0x1A, 2 bytes BE) + Minute(0x1C) + Second(0x1D)
+  const hour = read16BE(dataView, 0x1A);
+  const minute = dataView.getUint8(0x1C);
+  const second = dataView.getUint8(0x1D);
+  const timeStr = String(hour).padStart(2, '0') + ':' + String(minute).padStart(2, '0') + ':' + String(second).padStart(2, '0');
 
   // Sanity range
-  if (v > 200 || i > 100) {
-    log('Out of range: v=' + v + ' i=' + i, 'wrn');
-    return null;
-  }
+  if (v > 200 || i > 100) return null;
 
-  log('Parsed: V=' + v.toFixed(3) + ' A=' + i.toFixed(3) + ' (raw ' + vRaw + ',' + iRaw + ')', 'ok');
-  return { v, i };
+  return { v, i, p, e, c, temp, timeStr };
 };
 
 // ---------- Bluetooth ----------
@@ -307,9 +372,8 @@ btnConnect.addEventListener('click', async () => {
       if (txChar.properties.notify) {
         await txChar.startNotifications();
         txChar.addEventListener('characteristicvaluechanged', (e) => {
-          const dv = e.target.value;
-          const parsed = parseValue(dv);
-          if (parsed) pushPoint(parsed.v, parsed.i);
+          const parsed = parseValue(e.target.value);
+          if (parsed) pushPoint(parsed.v, parsed.i, parsed.p, parsed.e, parsed.c, parsed.temp, parsed.timeStr);
         });
       }
     } else {
@@ -356,16 +420,17 @@ const setConnected = (connected) => {
 
 btnClear.addEventListener('click', () => {
   readings.t = []; readings.v = []; readings.i = []; readings.p = [];
-  updateReadouts(null, null, null);
+  readings.e = []; readings.c = []; readings.temp = []; readings.time = [];
+  updateReadouts(null, null, null, null, null, null, null);
   chart.update();
   log('Chart cleared', 'wrn');
 });
 
 btnExport.addEventListener('click', () => {
   if (readings.t.length === 0) { log('No data to export', 'wrn'); return; }
-  let csv = 'time,voltage_V,current_A,power_W\n';
+  let csv = 'time,voltage_V,current_A,power_W,energy_Wh,capacity_Ah,temperature_C\n';
   for (let k = 0; k < readings.t.length; k++) {
-    csv += `${readings.t[k]},${readings.v[k] == null ? '' : readings.v[k]},${readings.i[k] == null ? '' : readings.i[k]},${readings.p[k] == null ? '' : readings.p[k]}\n`;
+    csv += `${readings.t[k]},${readings.v[k] == null ? '' : readings.v[k]},${readings.i[k] == null ? '' : readings.i[k]},${readings.p[k] == null ? '' : readings.p[k]},${readings.e[k] == null ? '' : readings.e[k]},${readings.c[k] == null ? '' : readings.c[k]},${readings.temp[k] == null ? '' : readings.temp[k]}\n`;
   }
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
