@@ -265,7 +265,7 @@ const parseValue = (dataView) => {
   if (msgType !== 0x01) return null; // only handle Report
 
   const deviceType = dataView.getUint8(3);
-  if (deviceType !== 0x01) return null; // only DC Meter report
+  if (deviceType !== 0x02) return null; // only DC Meter report
 
   // Checksum (last byte): sum(offset 2..len-2) & 0xff ^ 0x44
   const checksum = dataView.getUint8(len - 1);
