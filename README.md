@@ -1,29 +1,42 @@
 # Atorch DL24 Bluetooth Monitor
 
-Single-file web app that connects to an **Atorch DL24** USB-C power meter over Bluetooth Low Energy (Web Bluetooth API) and plots **Voltage and Current vs Time** live in the browser.
+Single-file web app that connects to an **Atorch DL24** USB-C power meter over Bluetooth Low Energy (Web Bluetooth API) and plots **Voltage, Current, Power, Energy, Capacity, and Temperature vs Time** live in the browser.
 
 ## Features
 
 - Connect to Atorch DL24 via Web Bluetooth (Chrome / Edge)
 - Parses the DL24 binary telemetry protocol (`0xFF 0x55` header, report packets)
-- Live readouts: Voltage (V), Current (A), Power (W)
-- Real-time line chart: Voltage vs Time + Current vs Time
-- Polling interval control, manual read, chart clear, CSV export
+- Live readouts: Voltage (V), Current (A), Power (W), Energy (Wh), Capacity (Ah), Temperature (°C), Time (HH:MM:SS)
+- Real-time line chart: all six parameters vs Time
+- Chart clear, CSV export
 - GATT service/characteristic discovery panel
 - Pre-filled DL24 UUIDs: Service `0000ffe0…`, Characteristic `0000ffe1…`
 
 ## Protocol
 
-The app parses the DL24 report packet format:
+The app parses the DL24 report packet format (Device Type `0x02` = DC Meter):
 
-| Offset | Field | Size | Note |
-|--------|-------|------|------|
-| 0 | Magic Header | 2 bytes | `0xFF 0x55` |
-| 2 | Message Type | 1 byte | `0x01` = Report |
-| 3 | Device Type | 1 byte | `0x02` = DC, `0x03` = USB |
-| 4 | Voltage | 3 bytes | 24-bit big-endian, /100 |
-| 7 | Current | 3 bytes | 24-bit big-endian, /100 |
-| last | Checksum | 1 byte | `(sum of bytes 2..len-2) & 0xFF ^ 0x44` |
+| Offset | Field | Size | Endian | Coefficient | Source |
+|--------|-------|------|--------|-------------|--------|
+| 0 | Magic Header | 2 bytes | — | `0xFF 0x55` | Packet |
+| 2 | Message Type | 1 byte | — | `0x01` = Report | Packet |
+| 3 | Device Type | 1 byte | — | `0x02` = DC Meter | Packet |
+| 4 | Voltage | 3 bytes | Big-endian | ÷ 10 | Packet → V |
+| 7 | Current | 3 bytes | Big-endian | ÷ 1000 | Packet → A |
+| 0x0A | Power | 3 bytes | Big-endian | ÷ 10 | Packet → W |
+| 0x0D | Energy | 4 bytes | Big-endian | ÷ 100 | Packet → Wh |
+| 0x18 | Temperature | 2 bytes | Big-endian (signed) | × 1 | Packet → °C |
+| 0x1A | Hour | 2 bytes | Big-endian | × 1 | Packet → HH |
+| 0x1C | Minute | 1 byte | — | × 1 | Packet → MM |
+| 0x1D | Second | 1 byte | — | × 1 | Packet → SS |
+| last | Checksum | 1 byte | — | `(sum of bytes 2..len-2) & 0xFF ^ 0x44` | Packet |
+
+### Derived / Calculated fields
+
+| Field | Calculation | Source |
+|-------|-------------|--------|
+| **Capacity (Ah)** | `Energy (Wh) ÷ Voltage (V)` | Calculated from packet Energy and Voltage |
+| **Time (HH:MM:SS)** | `Hour:Minute:Second` | Calculated from packet time fields |
 
 Protocol reference: https://github.com/CursedHardware/atorch-console/blob/master/docs/protocol-design.md
 
@@ -55,25 +68,24 @@ Protocol reference: https://github.com/CursedHardware/atorch-console/blob/master
    http://localhost:8000
    ```
 
-4. Click **Connect**, select your `DL24_BLE` device from the Bluetooth picker, then click **Start**. Voltage and Current will plot automatically every second.
+4. Click **Connect**, select your `DL24_BLE` device from the Bluetooth picker. Voltage, Current, Power, Energy, Capacity, and Temperature will plot automatically every second.
 
 ## Usage
 
 | Control | Action |
 |---------|--------|
 | **Connect** | Open the Bluetooth device picker and pair with the DL24 |
-| **Start / Stop** | Begin or stop automatic polling |
-| **Read Once** | Request a single telemetry read (if the characteristic supports read) |
 | **Clear** | Reset the chart and clear all samples |
-| **Export CSV** | Download `dl24_telemetry.csv` with time, voltage, current, power |
+| **Export CSV** | Download `dl24_telemetry.csv` with all measured and derived fields |
 | **Discover Services** | List all GATT services and characteristics for debugging |
-| **Polling interval** | Set how often to poll (ms) |
 
 ## Notes
 
-- The DL24 streams telemetry notifications automatically (~1 Hz), so data appears even without clicking Start.
-- If values look wrong, use the **GATT UUIDs** and **Value Parser** panels to adjust scale or endianness for your firmware revision.
-- The characteristic on most DL24 units is notify-only; `Read Once` may report "not readable" — this is normal.
+- The DL24 streams telemetry notifications automatically (~1 Hz), so data appears immediately after connecting.
+- Power is read directly from packet offset `0x0A` (÷10), not calculated as V×A.
+- Energy is read directly from packet offset `0x0D` (÷100).
+- Capacity (Ah) is derived as Energy (Wh) ÷ Voltage (V).
+- The characteristic on most DL24 units is notify-only.
 
 ## License
 

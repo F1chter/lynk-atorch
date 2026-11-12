@@ -304,16 +304,16 @@ const parseValue = (dataView) => {
   const iRaw = read24BE(dataView, 7);
   const i = iRaw / 1000;
 
-  // Power: offset 0x0A, 3 bytes BE, /10
-  const pRaw = read24BE(dataView, 0x0A);
-  const p = pRaw / 10;
+  // Power: v * i
+  const p = i * v;
 
-  // Energy: offset 0x0D, 4 bytes BE, /100
+  // Energy: offset 0x0D, 4 bytes BE
   const eRaw = read32BE(dataView, 0x0D);
-  const e = eRaw / 100;
+  const e = eRaw * 10;
 
-  // Capacity (Ah) = Energy (Wh) / Voltage (V)
-  const c = (v > 0) ? e / v : null;
+  // Capacity (Ah) =  offset 0x0A, 3 bytes BE, /100
+  const cRaw = read24BE(dataView, 0x0A);
+  const c = cRaw / 100;
 
   // Temperature: offset 0x18, 2 bytes BE signed
   const temp = read16BESigned(dataView, 0x18);
