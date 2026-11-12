@@ -281,6 +281,8 @@ const parseValue = (dataView) => {
   // Magic header FF 55 — ignore silently if missing
   if (dataView.getUint8(0) !== 0xff || dataView.getUint8(1) !== 0x55) return null;
 
+  log('Raw packet: ' + Array.from(new Uint8Array(dataView.buffer)).map(b=>b.toString(16).padStart(2,'0')).join(' '), 'info');
+
   const msgType = dataView.getUint8(2);
   if (msgType !== 0x01) return null; // only handle Report
 
