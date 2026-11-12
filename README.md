@@ -2,6 +2,8 @@
 
 Single-file web app that connects to an **Atorch DL24** USB-C power meter over Bluetooth Low Energy (Web Bluetooth API) and plots **Voltage, Current, Power, Energy, Capacity, and Temperature vs Time** live in the browser.
 
+**Live demo:** https://f1chter.github.io/lynk-atorch/
+
 ## Features
 
 - Connect to Atorch DL24 via Web Bluetooth (Chrome / Edge)
