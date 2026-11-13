@@ -149,9 +149,9 @@ const initChart = () => {
       labels: readings.t,
       datasets: [
         { label: 'Voltage (V)', data: readings.v, borderColor: '#22d3ee', backgroundColor: 'rgba(34,211,238,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
-        { label: 'Current (A)', data: readings.i, borderColor: '#fb7185', backgroundColor: 'rgba(251,113,133,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
-        { label: 'Capacity (Ah)', data: readings.c, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
-        { label: 'Temp (°C)', data: readings.temp, borderColor: '#fb923c', backgroundColor: 'rgba(251,146,60,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
+        { label: 'Current (A)', data: readings.i, borderColor: '#fb7185', backgroundColor: 'rgba(251,113,133,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y1' },
+        { label: 'Capacity (Ah)', data: readings.c, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y1' },
+        { label: 'Temp (°C)', data: readings.temp, borderColor: '#fb923c', backgroundColor: 'rgba(251,146,60,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y1' },
       ]
     },
     options: {
@@ -166,14 +166,14 @@ const initChart = () => {
           position: 'left',
           gridLines: { color: 'rgba(255,255,255,0.05)' },
           ticks: { color: '#94a3b8', fontSize: 11 },
-          scaleLabel: { display: true, labelString: 'V / W', fontColor: '#64748b', fontSize: 11 }
+          scaleLabel: { display: true, labelString: 'V', fontColor: '#64748b', fontSize: 11 }
         }, {
           id: 'y1',
           type: 'linear',
           position: 'right',
           gridLines: { drawOnChartArea: false },
           ticks: { color: '#94a3b8', fontSize: 11 },
-          scaleLabel: { display: true, labelString: 'A', fontColor: '#64748b', fontSize: 11 }
+          scaleLabel: { display: true, labelString: 'A / °C / Ah', fontColor: '#64748b', fontSize: 11 }
         }],
         xAxes: [{
           id: 'x',
