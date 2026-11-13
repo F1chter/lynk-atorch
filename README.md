@@ -9,8 +9,8 @@ Single-file web app that connects to an **Atorch DL24** USB-C power meter over B
 - Connect to Atorch DL24 via Web Bluetooth (Chrome / Edge)
 - Parses the DL24 binary telemetry protocol (`0xFF 0x55` header, report packets)
 - Live readouts: Voltage (V), Current (A), Power (W), Energy (Wh), Capacity (Ah), Temperature (°C), Time (HH:MM:SS)
-- Real-time line chart: five parameters (V, A, W, Ah, °C) vs Time using packet timestamps
-- Chart clear, CSV export (Energy excluded)
+- Real-time line chart: four parameters (V, A, Ah, °C) vs Time using packet timestamps
+- Chart clear, CSV export (Power and Energy excluded)
 - GATT service/characteristic discovery panel
 - Pre-filled DL24 UUIDs: Service `0000ffe0…`, Characteristic `0000ffe1…`
 

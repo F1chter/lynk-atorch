@@ -85,7 +85,6 @@
     <div class="flex gap-4 mt-2 text-xs text-slate-500">
       <span><span class="text-cyan-400">&#9632;</span> Voltage (V)</span>
       <span><span class="text-rose-400">&#9632;</span> Current (A)</span>
-      <span><span class="text-emerald-400">&#9632;</span> Power (W)</span>
       <span><span class="text-amber-400">&#9632;</span> Capacity (Ah)</span>
       <span><span class="text-orange-400">&#9632;</span> Temp (°C)</span>
     </div>
@@ -151,7 +150,6 @@ const initChart = () => {
       datasets: [
         { label: 'Voltage (V)', data: readings.v, borderColor: '#22d3ee', backgroundColor: 'rgba(34,211,238,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
         { label: 'Current (A)', data: readings.i, borderColor: '#fb7185', backgroundColor: 'rgba(251,113,133,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
-        { label: 'Power (W)', data: readings.p, borderColor: '#34d399', backgroundColor: 'rgba(52,211,153,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
         { label: 'Capacity (Ah)', data: readings.c, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
         { label: 'Temp (°C)', data: readings.temp, borderColor: '#fb923c', backgroundColor: 'rgba(251,146,60,0.1)', fill: false, pointRadius: 0, tension: 0.3, yAxisID: 'y' },
       ]
@@ -448,9 +446,9 @@ btnClear.addEventListener('click', () => {
 
 btnExport.addEventListener('click', () => {
   if (readings.t.length === 0) { log('No data to export', 'wrn'); return; }
-  let csv = 'time,voltage_V,current_A,power_W,capacity_Ah,temperature_C\n';
+  let csv = 'time,voltage_V,current_A,capacity_Ah,temperature_C\n';
   for (let k = 0; k < readings.t.length; k++) {
-    csv += `${readings.t[k]},${readings.v[k] == null ? '' : readings.v[k]},${readings.i[k] == null ? '' : readings.i[k]},${readings.p[k] == null ? '' : readings.p[k]},${readings.c[k] == null ? '' : readings.c[k]},${readings.temp[k] == null ? '' : readings.temp[k]}\n`;
+    csv += `${readings.t[k]},${readings.v[k] == null ? '' : readings.v[k]},${readings.i[k] == null ? '' : readings.i[k]},${readings.c[k] == null ? '' : readings.c[k]},${readings.temp[k] == null ? '' : readings.temp[k]}\n`;
   }
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
