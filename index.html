@@ -237,8 +237,8 @@ const pushPoint = (v, i, p, e, c, temp, timeStr) => {
   readings.temp.push(temp == null ? null : temp);
   readings.time.push(timeStr == null ? null : timeStr);
   updateReadouts(v, i, p, e, c, temp, timeStr);
-  chart.update();
-  log('pushPoint #'+readings.t.length+' V='+v+' A='+i+' Wh='+e+' Temp='+temp, 'ok');
+  try { chart.render(); } catch (err) { log('Chart render error: ' + err.message, 'err'); }
+  log('pushPoint #' + readings.t.length + ' V=' + v + ' A=' + i + ' Wh=' + e + ' Temp=' + temp, 'ok');
 };
 
 // ---------- DL24 Binary Protocol Parser ----------
@@ -444,7 +444,7 @@ btnClear.addEventListener('click', () => {
   readings.t = []; readings.v = []; readings.i = []; readings.p = [];
   readings.e = []; readings.c = []; readings.temp = []; readings.time = [];
   updateReadouts(null, null, null, null, null, null, null);
-  chart.update();
+  try { chart.render(); } catch (err) { log('Chart render error: ' + err.message, 'err'); }
   log('Chart cleared', 'wrn');
 });
 
