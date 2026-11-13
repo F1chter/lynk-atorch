@@ -133,7 +133,7 @@ let server = null;
 let txChar = null;
 let rxChar = null;
 const readings = { t: [], v: [], i: [], p: [], e: [], c: [], temp: [], time: [] };
-const MAX_POINTS = 1000;
+const MAX_POINTS = 3600;
 let chart = null;
 
 const btnConnect = document.getElementById('btnConnect');
@@ -222,8 +222,14 @@ const pushPoint = (v, i, p, e, c, temp, timeStr) => {
       newTemp.push(avg(readings.temp[a], readings.temp[b]));
       newTime.push(readings.time[b] == null ? null : readings.time[b]);
     }
-    readings.t = newT; readings.v = newV; readings.i = newI; readings.p = newP;
-    readings.e = newE; readings.c = newC; readings.temp = newTemp; readings.time = newTime;
+    readings.t.splice(0, readings.t.length, ...newT);
+    readings.v.splice(0, readings.v.length, ...newV);
+    readings.i.splice(0, readings.i.length, ...newI);
+    readings.p.splice(0, readings.p.length, ...newP);
+    readings.e.splice(0, readings.e.length, ...newE);
+    readings.c.splice(0, readings.c.length, ...newC);
+    readings.temp.splice(0, readings.temp.length, ...newTemp);
+    readings.time.splice(0, readings.time.length, ...newTime);
     log('Compacted buffer to ' + readings.t.length + ' samples', 'wrn');
   }
 
